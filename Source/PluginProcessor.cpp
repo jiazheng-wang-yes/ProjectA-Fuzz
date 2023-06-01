@@ -166,7 +166,8 @@ bool ProjectAAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* ProjectAAudioProcessor::createEditor()
 {
-    return new ProjectAAudioProcessorEditor (*this);
+//    return new ProjectAAudioProcessorEditor (*this);
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -188,4 +189,28 @@ void ProjectAAudioProcessor::setStateInformation (const void* data, int sizeInBy
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new ProjectAAudioProcessor();
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout ProjectAAudioProcessor::CreateParameterLayout()
+{
+    juce::AudioProcessorValueTreeState::ParameterLayout layout;
+    
+    layout.add(std::make_unique<juce::AudioParameterFloat>("volume",
+                                                           "volume",
+                                                           juce::NormalisableRange<float>(-24.f, 24.f, 0.5f, 1.f),
+                                                           0.0f));
+    
+    layout.add(std::make_unique<juce::AudioParameterFloat>("fuzz",
+                                                           "fuzz",
+                                                           juce::NormalisableRange<float>(0.f, 100.f, 1.f, 1.f),
+                                                           0.0f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("low cut",
+                                                           "low cut",
+                                                           juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f),
+                                                           20.f));
+    layout.add(std::make_unique<juce::AudioParameterFloat>("high cut",
+                                                           "high cut",
+                                                           juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f),
+                                                           20000.f));
+    return layout;
 }
