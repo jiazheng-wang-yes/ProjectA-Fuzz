@@ -95,6 +95,13 @@ void ProjectAAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    juce::dsp::ProcessSpec spec;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = 1;
+    spec.sampleRate = sampleRate;
+    leftChannel.prepare(spec);
+    rightChannel.prepare(spec);
+    
 }
 
 void ProjectAAudioProcessor::releaseResources()
@@ -150,12 +157,23 @@ void ProjectAAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
-    }
+//    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+//    {
+//        auto* channelData = buffer.getWritePointer (channel);
+//
+//        // ..do something to the data...
+//    }
+    juce::dsp::AudioBlock<float> block(buffer);
+    
+    auto leftBlock = block.getSingleChannelBlock(0);
+    auto rightBlock = block.getSingleChannelBlock(1);
+    
+    juce::dsp::ProcessContextReplacing<float> leftContext(leftBlock);
+    juce::dsp::ProcessContextReplacing<float> rightContext(rightBlock);
+    
+    leftChannel.process(leftContext);
+    rightChannel.process(rightContext);
+    
 }
 
 //==============================================================================
@@ -212,5 +230,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout ProjectAAudioProcessor::Crea
                                                            "high cut",
                                                            juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f),
                                                            20000.f));
+    juce::StringArray stringArray;
+    for (int i = 0; i < 4; i++) {
+        juce::String str;
+        str << (12 * i * 12);
+        str << " db/oct";
+        stringArray.add(str);
+    }
+    
+    layout.add(std::make_unique<juce::AudioParameterChoice>("LowCut Slope", "LowCut Slope", stringArray, 0));
+    layout.add(std::make_unique<juce::AudioParameterChoice>("HighCut Slope", "HighCut Slope", stringArray, 0));
     return layout;
 }
