@@ -208,10 +208,10 @@ void ProjectAAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     *rightLowCut.get<0>().coefficients = *lowCutCoeff[0];
     rightLowCut.setBypassed<0>(false);
     
-    float gain = *apvts.getRawParameterValue("fuzz") * 60;
+    float gain = chainSettings.fuzz;
 
-    float volume = *apvts.getRawParameterValue("volume");
-    
+    float volume = chainSettings.volume;
+
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
         {
             auto* channelData = buffer.getReadPointer(channel);
