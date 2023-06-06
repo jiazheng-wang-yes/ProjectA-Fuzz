@@ -102,6 +102,30 @@ void ProjectAAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlo
     leftChannel.prepare(spec);
     rightChannel.prepare(spec);
     
+//    auto chainSettings = getChainSettings(apvts);
+//
+//    auto lowCutCoeff = juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.low_cut,
+//                                                                                                   sampleRate,
+//                                                                                                   2 * (chainSettings.lowCutSlope + 1));
+//    auto& leftLowCut = leftChannel.get<ChainPositions::LowCut>();
+//
+//    leftLowCut.setBypassed<0>(true);
+//    leftLowCut.setBypassed<1>(true);
+//    leftLowCut.setBypassed<2>(true);
+//    leftLowCut.setBypassed<3>(true);
+//
+//    *leftLowCut.get<0>().coefficients = *lowCutCoeff[0];
+//    leftLowCut.setBypassed<0>(false);
+//
+//    auto& rightLowCut = rightChannel.get<ChainPositions::LowCut>();
+//
+//    rightLowCut.setBypassed<0>(true);
+//    rightLowCut.setBypassed<1>(true);
+//    rightLowCut.setBypassed<2>(true);
+//    rightLowCut.setBypassed<3>(true);
+//
+//    *rightLowCut.get<0>().coefficients = *lowCutCoeff[0];
+//    rightLowCut.setBypassed<0>(false);
 }
 
 void ProjectAAudioProcessor::releaseResources()
@@ -157,13 +181,57 @@ void ProjectAAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-//    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-//    {
-//        auto* channelData = buffer.getWritePointer (channel);
-//
-//        // ..do something to the data...
-//    }
+
+    auto chainSettings = getChainSettings(apvts);
+    
+    
+    auto lowCutCoeff = juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.low_cut,
+                                                                                                   getSampleRate(),
+                                                                                                   2 * (chainSettings.lowCutSlope + 1));
+    auto& leftLowCut = leftChannel.get<ChainPositions::LowCut>();
+
+    leftLowCut.setBypassed<0>(true);
+    leftLowCut.setBypassed<1>(true);
+    leftLowCut.setBypassed<2>(true);
+    leftLowCut.setBypassed<3>(true);
+
+    *leftLowCut.get<0>().coefficients = *lowCutCoeff[0];
+    leftLowCut.setBypassed<0>(false);
+    
+    auto& rightLowCut = rightChannel.get<ChainPositions::LowCut>();
+    
+    rightLowCut.setBypassed<0>(true);
+    rightLowCut.setBypassed<1>(true);
+    rightLowCut.setBypassed<2>(true);
+    rightLowCut.setBypassed<3>(true);
+
+    *rightLowCut.get<0>().coefficients = *lowCutCoeff[0];
+    rightLowCut.setBypassed<0>(false);
+    
+    float gain = *apvts.getRawParameterValue("fuzz") * 60;
+
+    float volume = *apvts.getRawParameterValue("volume");
+    
+    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+        {
+            auto* channelData = buffer.getReadPointer(channel);
+
+            for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+            {
+                float drySample = channelData[sample];
+                float wetSignal = drySample * juce::Decibels::decibelsToGain(gain);
+                if (wetSignal > 0.99) {
+                    wetSignal *= 0.99 / std::abs(wetSignal);
+                }
+
+                buffer.getWritePointer(channel)[sample] = wetSignal;
+                buffer.getWritePointer(channel)[sample] *= volume;
+            }
+        }
+    
     juce::dsp::AudioBlock<float> block(buffer);
+    
+  
     
     auto leftBlock = block.getSingleChannelBlock(0);
     auto rightBlock = block.getSingleChannelBlock(1);
@@ -173,6 +241,10 @@ void ProjectAAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juc
     
     leftChannel.process(leftContext);
     rightChannel.process(rightContext);
+    
+    
+
+    
     
 }
 
@@ -209,6 +281,19 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
     return new ProjectAAudioProcessor();
 }
 
+ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts) {
+    ChainSettings settings;
+    
+    settings.volume = apvts.getRawParameterValue("volume")->load();
+    settings.fuzz = apvts.getRawParameterValue("fuzz")->load();
+    settings.low_cut = apvts.getRawParameterValue("low cut")->load();
+    settings.high_cut = apvts.getRawParameterValue("high cut")->load();
+//    settings.lowCutSlope = apvts.getRawParameterValue("LowCut Slope")->load();
+//    settings.highCutSlope = apvts.getRawParameterValue("HighCut Slope")->load();
+    
+    return settings;
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout ProjectAAudioProcessor::CreateParameterLayout()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
@@ -224,21 +309,21 @@ juce::AudioProcessorValueTreeState::ParameterLayout ProjectAAudioProcessor::Crea
                                                            0.0f));
     layout.add(std::make_unique<juce::AudioParameterFloat>("low cut",
                                                            "low cut",
-                                                           juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f),
+                                                           juce::NormalisableRange<float>(20.f, 5000.f, 1.f, 1.f),
                                                            20.f));
     layout.add(std::make_unique<juce::AudioParameterFloat>("high cut",
                                                            "high cut",
                                                            juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f),
                                                            20000.f));
-    juce::StringArray stringArray;
-    for (int i = 0; i < 4; i++) {
-        juce::String str;
-        str << (12 * i * 12);
-        str << " db/oct";
-        stringArray.add(str);
-    }
-    
-    layout.add(std::make_unique<juce::AudioParameterChoice>("LowCut Slope", "LowCut Slope", stringArray, 0));
-    layout.add(std::make_unique<juce::AudioParameterChoice>("HighCut Slope", "HighCut Slope", stringArray, 0));
+//    juce::StringArray stringArray;
+//    for (int i = 0; i < 4; i++) {
+//        juce::String str;
+//        str << (12 * i * 12);
+//        str << " db/oct";
+//        stringArray.add(str);
+//    }
+//
+//    layout.add(std::make_unique<juce::AudioParameterChoice>("LowCut Slope", "LowCut Slope", stringArray, 0));
+//    layout.add(std::make_unique<juce::AudioParameterChoice>("HighCut Slope", "HighCut Slope", stringArray, 0));
     return layout;
 }

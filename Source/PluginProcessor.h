@@ -10,6 +10,14 @@
 
 #include <JuceHeader.h>
 
+
+struct ChainSettings {
+    float volume {0}, fuzz {0}, low_cut {0}, high_cut {0};
+    int lowCutSlope {0}, highCutSlope {0};
+};
+
+ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts);
+
 //==============================================================================
 /**
 */
@@ -66,9 +74,15 @@ private:
     
     using CutFilter = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
     
-    using MonoChain = juce::dsp::ProcessorChain<CutFilter, Filter, CutFilter>;
+    using MonoChain = juce::dsp::ProcessorChain<CutFilter, CutFilter>;
     
     MonoChain leftChannel, rightChannel;
+    
+    enum ChainPositions {
+        LowCut,
+        
+        HighCut
+    };
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProjectAAudioProcessor)
